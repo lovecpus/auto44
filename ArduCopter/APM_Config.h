@@ -16,7 +16,7 @@
 #define NAV_GUIDED            DISABLED            // disable external navigation computer ability to control vehicle through MAV_CMD_NAV_GUIDED mission commands
 #define PRECISION_LANDING     DISABLED            // disable precision landing using companion computer or IRLock sensor
 #define BEACON_ENABLED        DISABLED            // disable beacon support
-//#define STATS_ENABLED         DISABLED            // disable statistics support
+#define STATS_ENABLED         DISABLED            // disable statistics support
 //#define MODE_ACRO_ENABLED     DISABLED            // disable acrobatic mode support
 //#define MODE_AUTO_ENABLED     DISABLED            // disable auto mode support
 //#define MODE_BRAKE_ENABLED    DISABLED            // disable brake mode support
@@ -25,16 +25,21 @@
 #define MODE_FLIP_ENABLED     DISABLED            // disable flip mode support
 #define MODE_FOLLOW_ENABLED   DISABLED            // disable follow mode support
 //#define MODE_GUIDED_ENABLED   DISABLED            // disable guided mode support
-//#define MODE_GUIDED_NOGPS_ENABLED   DISABLED      // disable guided/nogps mode support
+#define MODE_GUIDED_NOGPS_ENABLED   DISABLED      // disable guided/nogps mode support
 //#define MODE_LOITER_ENABLED   DISABLED            // disable loiter mode support
 //#define MODE_POSHOLD_ENABLED  DISABLED            // disable poshold mode support
 //#define MODE_RTL_ENABLED      DISABLED            // disable rtl mode support
-//#define MODE_SMARTRTL_ENABLED DISABLED            // disable smartrtl mode support
+#define MODE_SMARTRTL_ENABLED DISABLED            // disable smartrtl mode support
 #define MODE_SPORT_ENABLED    DISABLED            // disable sport mode support
 //#define MODE_SYSTEMID_ENABLED DISABLED            // disable system ID mode support
 #define MODE_THROW_ENABLED    DISABLED            // disable throw mode support
-//#define MODE_ZIGZAG_ENABLED   DISABLED            // disable zigzag mode support
-//#define OSD_ENABLED           DISABLED            // disable on-screen-display support
+#define MODE_ZIGZAG_ENABLED   DISABLED            // disable zigzag mode support
+#ifdef OSD_ENABLED
+#undef OSD_ENABLED
+#define OSD_ENABLED           DISABLED            // disable on-screen-display support
+#else
+#define OSD_ENABLED           DISABLED            // disable on-screen-display support
+#endif
 
 // features below are disabled by default on all boards
 //#define CAL_ALWAYS_REBOOT                         // flight controller will reboot after compass or accelerometer calibration completes
