@@ -39,7 +39,9 @@ public:
         AUTOROTATE =   26,  // Autonomous autorotation
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
-
+#if MODE_CNDN_ENABLED
+        CNDN_MODE_NUMBERS()
+#endif
         // Mode number 127 reserved for the "drone show mode" in the Skybrush
         // fork at https://github.com/skybrush-io/ardupilot
     };
@@ -1918,4 +1920,8 @@ private:
     void warning_message(uint8_t message_n);    //Handles output messages to the terminal
 
 };
+#endif
+
+#if MODE_CNDN_ENABLED == ENABLED
+#include "mode_cndn.hpp"
 #endif

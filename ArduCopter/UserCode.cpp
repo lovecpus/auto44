@@ -24,22 +24,27 @@ void Copter::userhook_50Hz()
 
 #ifdef USERHOOK_MEDIUMLOOP
 void Copter::userhook_MediumLoop()
-{
-    // put your 10Hz code here
+{   // put your 10Hz code here
+#if MODE_CNDN_ENABLED
+    copter.mode_cndn.check_avoidance();
+    copter.mode_cndn.check_spraying();
+#endif
 }
 #endif
 
 #ifdef USERHOOK_SLOWLOOP
 void Copter::userhook_SlowLoop()
-{
-    // put your 3.3Hz code here
+{   // put your 3.3Hz code here
 }
 #endif
 
 #ifdef USERHOOK_SUPERSLOWLOOP
 void Copter::userhook_SuperSlowLoop()
-{
-    // put your 1Hz code here
+{   // put your 1Hz code here
+#if MODE_CNDN_ENABLED
+    // 농약, 배터리
+    copter.mode_cndn.check_sensors();
+#endif
 }
 #endif
 
