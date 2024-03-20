@@ -17,13 +17,14 @@
 #include <inttypes.h>
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
 
-#define AC_SPRAYER_DEFAULT_PUMP_RATE        10.0f   ///< default quantity of spray per meter travelled
+#define AC_SPRAYER_DEFAULT_PUMP_RATE        12.0f   ///< default quantity of spray per meter travelled
 #define AC_SPRAYER_DEFAULT_PUMP_MIN         0       ///< default minimum pump speed expressed as a percentage from 0 to 100
-#define AC_SPRAYER_DEFAULT_SPINNER_PWM      1300    ///< default speed of spinner (higher means spray is throw further horizontally
-#define AC_SPRAYER_DEFAULT_SPEED_MIN        100     ///< we must be travelling at least 1m/s to begin spraying
+#define AC_SPRAYER_DEFAULT_SPINNER_PWM      1000    ///< default speed of spinner (higher means spray is throw further horizontally
+#define AC_SPRAYER_DEFAULT_SPEED_MIN        50      ///< we must be travelling at least 1m/s to begin spraying
 #define AC_SPRAYER_DEFAULT_TURN_ON_DELAY    100     ///< delay between when we reach the minimum speed and we begin spraying.  This reduces the likelihood of constantly turning on/off the pump
-#define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   1000    ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
+#define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   500     ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
 
 #ifndef HAL_SPRAYER_ENABLED
 #define HAL_SPRAYER_ENABLED 1
@@ -42,6 +43,47 @@ public:
 
     static AC_Sprayer *get_singleton();
     static AC_Sprayer *_singleton;
+
+    /// active - toggle switch for sprayer
+    void active(const bool true_false);
+    bool is_active() { return _flags.active != 0; }
+
+    /// test_pump - set to true to turn on pump as if travelling at 1m/s as a test
+    bool is_test_pump() { return  _flags.testing; }
+
+    /// To-Do: add function to decode pilot input from channel 6 tuning knob
+    bool is_manual() const { return _flags.manual; }
+
+    /// manual_pump - set to true to turn on pump as if travelling at 1m/s as a test
+    void manual_pump(bool true_false) { _flags.manual = true_false; }
+
+    /// set_manual_speed - sets manusl pump speed ms
+    void set_manual_speed(float _speed) { _manual_speed = _speed; }
+
+    /// set armed
+    void set_fullspray(uint8_t fullspray) { _flags.fullspray = fullspray; }
+
+    bool is_fullspray() { return _flags.fullspray != 0; }
+
+    bool is_test_empty() { return _flags.test_empty; }
+
+    void set_empty(bool true_false) { _flags.empty = true_false; }
+    bool is_empty() { return _flags.empty; }
+
+    void set_spreader(bool true_false) { _flags.spreader = true_false; }
+    bool is_spreader() { return _flags.spreader; }
+
+    /// increase/decrease percentage of the pumps maximum rate
+    float inc_pump_rate(float percentage) {
+        float pcs = _pump_pct_1ms.get() + percentage;
+        pcs = MIN(pcs, 150);
+        pcs = MAX(pcs, 1);
+        _pump_pct_1ms.set_and_save(pcs);
+        return pcs;
+    }
+
+    float get_manual_speed() { return _manual_speed; }
+    bool test_sensor(float cn);
 
     /// run - allow or disallow spraying to occur
     void run(bool true_false);
@@ -73,17 +115,26 @@ private:
     AP_Int8         _pump_min_pct;          ///< minimum pump rate (expressed as a percentage from 0 to 100)
     AP_Int16        _spinner_pwm;           ///< pwm rate of spinner
     AP_Float        _speed_min;             ///< minimum speed in cm/s above which the sprayer will be started
+    AP_Int16        _pump_back_rate;        ///< pwm rate of spinner
 
     /// flag bitmask
     struct sprayer_flags_type {
-        uint8_t spraying    : 1;            ///< 1 if we are currently spraying
-        uint8_t testing     : 1;            ///< 1 if we are testing the sprayer and should output a minimum value
-        uint8_t running     : 1;            ///< 1 if we are permitted to run sprayer
+        uint16_t spraying    : 1;            ///< 1 if we are currently spraying
+        uint16_t testing     : 1;            ///< 1 if we are testing the sprayer and should output a minimum value
+        uint16_t running     : 1;            ///< 1 if we are permitted to run sprayer
+        uint16_t manual      : 1;            ///< 1 if we are permitted to manual sprayer
+        uint16_t test_empty  : 1;            ///< 1 if we are permitted to manual sprayer
+        uint16_t fullspray   : 1;            ///< 1 if we are permitted to arm motors
+        uint16_t active      : 1;            ///< 1 if we are permitted to run sprayer
+        uint16_t empty       : 1;            ///< 1 if we are permitted to empty
+        uint16_t spreader    : 1;            ///< 1 if we are permitted to spreader
     } _flags;
 
     // internal variables
     uint32_t        _speed_over_min_time;   ///< time at which we reached speed minimum
     uint32_t        _speed_under_min_time;  ///< time at which we fell below speed minimum
+    uint32_t        _rate_dt;
+    float           _manual_speed;
 
     void stop_spraying();
 };

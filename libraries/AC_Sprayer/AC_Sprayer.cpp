@@ -51,6 +51,14 @@ const AP_Param::GroupInfo AC_Sprayer::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("PUMP_MIN",   4, AC_Sprayer, _pump_min_pct, AC_SPRAYER_DEFAULT_PUMP_MIN),
 
+    // @Param: PUMP_BACK
+    // @DisplayName: Pump back speed minimum
+    // @Description: Minimum pump speed expressed as a percentage
+    // @Units: %
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PUMP_BACK",  5, AC_Sprayer, _pump_back_rate, 12),
+
     AP_GROUPEND
 };
 
@@ -75,6 +83,9 @@ AC_Sprayer::AC_Sprayer()
     }
 
     // To-Do: ensure that the pump and spinner servo channels are enabled
+    _manual_speed = 300.0f;
+    _flags.test_empty = false;
+    _flags.manual = false;
 }
 
 /*
@@ -95,7 +106,7 @@ void AC_Sprayer::run(const bool activate)
 
     // set flag indicate whether spraying is permitted:
     // do not allow running to be set to true if we are currently not enabled
-    _flags.running = _enabled && activate;
+    _flags.running = _enabled && activate && _flags.active;
 
     // turn off the pump and spinner servos if necessary
     if (!_flags.running) {
@@ -109,6 +120,12 @@ void AC_Sprayer::stop_spraying()
     SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::Limit::MIN);
 
     _flags.spraying = false;
+}
+
+bool AC_Sprayer::test_sensor(float cn) {
+    if (_spinner_pwm.get() == 0)
+        return true;
+    return (cn >= _spinner_pwm.get() * 1.0f);
 }
 
 /// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
@@ -139,6 +156,21 @@ void AC_Sprayer::update()
     const uint32_t now = AP_HAL::millis();
 
     bool should_be_spraying = _flags.spraying;
+
+    // check foreback
+    float vx = velocity.x * 100.0f / ground_speed;
+    float vy = velocity.y * 100.0f / ground_speed;
+    float vw = AP::ahrs().yaw_sensor;
+    float ax = cosf(vw * M_PI / 18000.0f);
+    float ay = sinf(vw * M_PI / 18000.0f);
+    float aw = ax*vx + ay*vy;
+
+    int8_t should_foreback = 0;
+    if (ground_speed >= _speed_min) {
+        if (aw >= 0.85f) should_foreback = 1;
+        else if (aw <= -0.85f) should_foreback = -1;
+    }
+
     // check our speed vs the minimum
     if (ground_speed >= _speed_min) {
         // if we are not already spraying
@@ -174,21 +206,69 @@ void AC_Sprayer::update()
         _speed_over_min_time = 0;
     }
 
+    float pct = _pump_pct_1ms.get();
     // if testing pump output speed as if traveling at 1m/s
-    if (_flags.testing) {
-        ground_speed = 100.0f;
+    if (_flags.testing && !is_spreader()) {
+        ground_speed = 200.0f;
         should_be_spraying = true;
+        should_foreback = 1;
+        pct = 20.0f;
+    }
+
+    bool bFull = is_fullspray();
+    if (_flags.manual) {
+        ground_speed = _manual_speed;
+        should_be_spraying = true;
+        pct = 20.0f;
+        bFull = true;
     }
 
     // if spraying or testing update the pump servo position
+    float back = _pump_back_rate.get() * 100;
+    back = MAX(back, 0); // ensure min pump speed
+    back = MIN(back, 10000); // clamp to range
+    float pos = ground_speed * pct;
+    pos = MAX(pos, 100 * _pump_min_pct.get()); // ensure min pump speed
+    pos = MIN(pos, 10000); // clamp to range
+
     if (should_be_spraying) {
-        float pos = ground_speed * _pump_pct_1ms;
-        pos = MAX(pos, 100 *_pump_min_pct); // ensure min pump speed
-        pos = MIN(pos,10000); // clamp to range
-        SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
-        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
+        if (is_spreader()) {
+            _flags.test_empty = false;
+            SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
+            SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, back, 0, 10000);
+        } else {
+            if (_pump_back_rate.get() < 0) {
+                // 전후방 분사
+                SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
+                SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, pos, 0, 10000);
+            } else {
+                if (bFull || _flags.testing) {
+                    // 전후방 분사
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, pos, 0, 10000);
+                } else if (should_foreback == -1) {
+                    // 후방 문사
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, back, 0, 10000);
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, pos, 0, 10000);
+                } else if (should_foreback == +1) {
+                    // 전방 분사
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, back, 0, 10000);
+                } else {
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, 0, 0, 10000);
+                    SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, 0, 0, 10000);
+                }
+            }
+            _flags.test_empty = pos >= (100 * _pump_min_pct.get() + (_pump_pct_1ms.get() * _speed_min.get()));
+        }
         _flags.spraying = true;
+    } else if (is_spreader()) {
+        _flags.test_empty = false;
+        SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, 0, 0, 10000);
+        SRV_Channels::move_servo(SRV_Channel::k_sprayer_spinner, back, 0, 10000);
+        _flags.spraying = false;
     } else {
+        _flags.test_empty = false;
         stop_spraying();
     }
 }
