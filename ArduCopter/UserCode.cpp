@@ -25,7 +25,7 @@ void Copter::userhook_50Hz()
 #ifdef USERHOOK_MEDIUMLOOP
 void Copter::userhook_MediumLoop()
 {   // put your 10Hz code here
-#if MODE_CNDN_ENABLED
+#if MODE_CNDN_ENABLED == ENABLED
     copter.mode_cndn.check_avoidance();
     copter.mode_cndn.check_spraying();
 #endif

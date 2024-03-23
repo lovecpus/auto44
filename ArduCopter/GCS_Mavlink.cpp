@@ -1421,6 +1421,9 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         handle_common_message(msg);
         break;
     }     // end switch
+#if MODE_CNDN_ENABLED == ENABLED
+    copter.mode_cndn.handle_message(msg);
+#endif    
 } // end handle mavlink
 
 

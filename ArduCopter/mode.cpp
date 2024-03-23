@@ -175,6 +175,10 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_CNDN_ENABLED == ENABLED
+        CASE_MODE_NUMBER_CNDN()
+#endif
+
         default:
             break;
     }

@@ -62,4 +62,4 @@
 //#define USERHOOK_AUXSWITCH ENABLED                        // for code to handle user aux switches
 //#define USER_PARAMS_ENABLED ENABLED                       // to enable user parameters
 
-#define	MODE_CNDN_ENABLED			DISABLED
+#define	MODE_CNDN_ENABLED			ENABLED
