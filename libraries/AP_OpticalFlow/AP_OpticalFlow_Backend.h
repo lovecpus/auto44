@@ -20,6 +20,8 @@
 
 #include "AP_OpticalFlow.h"
 
+#if AP_OPTICALFLOW_ENABLED
+
 class OpticalFlow_backend
 {
     friend class AP_OpticalFlow;
@@ -67,3 +69,5 @@ protected:
     // semaphore for access to shared frontend data
     HAL_Semaphore _sem;
 };
+
+#endif

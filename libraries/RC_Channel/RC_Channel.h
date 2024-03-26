@@ -220,6 +220,15 @@ public:
 
         // if you add something here, make sure to update the documentation of the parameter in RC_Channel.cpp!
         // also, if you add an option >255, you will need to fix duplicate_options_exist
+        CNDN =               120, // CNDN mode
+        CNDN_AUTO =          121, // CNDN_AUTO find waypoint / do edge finder
+        CNDN_PUMP =          122, // CNDN Manual pump rate
+        CNDN_SPD_UP =        123, // CNDN Move speed up
+        CNDN_SPD_DN =        124, // CNDN Move speed down
+        CNDN_SPR_UP =        125, // CNDN Sprayer rate up
+        CNDN_SPR_DN =        126, // CNDN Sprayer rate down
+        CNDN_SPR_FF =        127, // CNDN Sprayer fully
+        CNDN_TRIG02 =        128, // CNDN trigger mode 2
 
         // options 150-199 continue user rc switch options
         CRUISE =             150,  // CRUISE mode

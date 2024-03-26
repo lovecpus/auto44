@@ -176,3 +176,24 @@ template <typename T> void BIT_CLEAR (T& value, uint8_t bitnumber) noexcept {
      static_assert(std::is_integral<T>::value, "Integral required.");
      ((value) &= ~((T)(1U) << (bitnumber)));
  }
+
+class CNTimeout
+{
+private:
+    uint32_t    m_s;
+    bool        b_disabled;
+
+public:
+    CNTimeout(bool _disab=false) : m_s(0), b_disabled(_disab) {}
+    CNTimeout& reset(uint32_t s) { m_s = s; b_disabled = false; return *this; }
+    CNTimeout& disable() { b_disabled = true; return *this; }
+    bool isEnabled() { return !b_disabled; }
+    bool isTimeout(uint32_t s, uint32_t tio) {
+        if (b_disabled) return false;
+        if (s > m_s + tio) {
+            m_s = s + tio;
+            return true;
+        }
+        return false;
+    }
+};

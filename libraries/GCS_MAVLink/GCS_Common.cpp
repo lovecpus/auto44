@@ -2755,6 +2755,32 @@ MAV_STATE GCS_MAVLINK::system_status() const
     return _system_status;
 }
 
+void GCS::send_cndn_trigger(const Location& home, const Location& loc, uint16_t dist_edge_cm, uint16_t spray_width_cm, uint8_t _mode, int16_t heading) {
+    for (uint8_t i=0; i<num_gcs(); i++) {
+        chan(i)->send_cndn_trigger(home, loc, dist_edge_cm, spray_width_cm, _mode, heading);
+    }
+}
+
+void GCS_MAVLINK::send_cndn_trigger(const Location& home, const Location& loc, uint16_t dist_edge_cm, uint16_t spray_width_cm, uint8_t _mode, int16_t heading) {
+    if (HAVE_PAYLOAD_SPACE(chan, CNDN_TRIGGER)) {
+        mavlink_msg_cndn_trigger_send(chan, AP_HAL::millis(), home.lat, home.lng, loc.lat, loc.lng, dist_edge_cm, spray_width_cm, _mode, heading);
+    }
+}
+
+void GCS::send_cndn_request(uint8_t tgtid, uint8_t tgtcmp, uint8_t sess, uint16_t size, uint16_t offset)
+{
+    for (uint8_t i=0; i<num_gcs(); i++) {
+        chan(i)->send_cndn_request(tgtid, tgtcmp, sess, size, offset);
+    }
+}
+
+void  GCS_MAVLINK::send_cndn_request(uint8_t tgtid, uint8_t tgtcmp, uint8_t sess, uint16_t size, uint16_t offset)
+{
+    if (HAVE_PAYLOAD_SPACE(chan, CNDN_REQUEST)) {
+        mavlink_msg_cndn_request_send(chan, tgtid, tgtcmp, sess, size, offset);
+    }
+}
+
 /*
   Send MAVLink heartbeat
  */

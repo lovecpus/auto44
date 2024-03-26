@@ -473,6 +473,8 @@ public:
 
     MAV_RESULT set_message_interval(uint32_t msg_id, int32_t interval_us);
 
+    void send_cndn_trigger(const Location& home, const Location& loc, uint16_t dist_edge_cm, uint16_t spray_width_cm, uint8_t _mode, int16_t heading);
+    void send_cndn_request(uint8_t tgtid, uint8_t tgtcmp, uint8_t sess, uint16_t size, uint16_t offset);
 protected:
 
     bool mavlink_coordinate_frame_to_location_alt_frame(MAV_FRAME coordinate_frame,
@@ -1223,6 +1225,8 @@ public:
 
     virtual uint8_t sysid_this_mav() const = 0;
 
+    void send_cndn_trigger(const Location& home, const Location& loc, uint16_t dist_edge_cm, uint16_t spray_width_cm, uint8_t mode, int16_t heading);
+    void send_cndn_request(uint8_t tgtid, uint8_t tgtcmp, uint8_t sess, uint16_t size, uint16_t offset);
 protected:
 
     virtual GCS_MAVLINK *new_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params,

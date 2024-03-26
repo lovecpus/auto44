@@ -2,6 +2,166 @@
 
 #if MODE_CNDN_ENABLED == ENABLED
 
+const AP_Param::GroupInfo ModeCNDN::var_info[] = {
+    // @Param: METHOD
+    // @DisplayName: Mode using method
+    // @Description: Mode using method of CNDN & ETRI Mission computer
+    // @Values: 0: Disable, 1: All enable, 2: Take picture only, 2: Edge follow only, 3: Take picture after Edge following
+    // @User: Advance
+    AP_GROUPINFO_FLAGS("METHOD", 0, ModeCNDN, _method, 2, AP_PARAM_FLAG_ENABLE),
+
+    // @Param: TAKE_ALT
+    // @DisplayName: Take picture altitute
+    // @Description: Altitute of take picture
+    // @Units: cm
+    // @Range: 100 2000
+    // @User: Advance
+    AP_GROUPINFO("TAKEOFF_ALT", 1, ModeCNDN, _take_alt_cm, 200),
+
+    // @Param: MISSION_ALT
+    // @DisplayName: Mission altitute
+    // @Description: Altitute of mission planning
+    // @Units: cm
+    // @Range: 200 1000
+    // @User: Advance
+    AP_GROUPINFO("MISSION_ALT", 2, ModeCNDN, _mission_alt_cm, 300),
+
+    // @Param: SPRAY_WIDTH
+    // @DisplayName: Spray width
+    // @Description: Mission planning width of spraying
+    // @Units: cm
+    // @Range: 3000 8000
+    // @User: Advance
+    AP_GROUPINFO("SPRAY_WIDTH", 3, ModeCNDN, _spray_width_cm, 400),
+
+    // @Param: DIS_EDGE
+    // @DisplayName: Distance Edge
+    // @Description: Distance from Edge
+    // @Units: cms
+    // @Range: 100 800
+    // @User: Advance
+    AP_GROUPINFO("DIS_EDGE", 4, ModeCNDN, _dst_eg_cm, 250),
+
+    // @Param: SPD_EDGE mission
+    // @DisplayName: Speed edge
+    // @Description: Mission speed for Edge
+    // @Units: cm
+    // @Range: 100 1000
+    // @User: Advance
+    AP_GROUPINFO("SPD_EDGE", 5, ModeCNDN, _spd_edge_cm, 350),
+
+    // @Param: SPD_AUTO
+    // @DisplayName: Speed auto mission
+    // @Description: Mission speed for Auto
+    // @Units: cm
+    // @Range: 100 1000
+    // @User: Advance
+    AP_GROUPINFO("SPD_AUTO", 6, ModeCNDN, _spd_auto_cm, 500),
+
+    // @Param: RADAR_FLT_HZ
+    // @DisplayName: RADAR Filter Herz
+    // @Description: Radar low pass filter frequency
+    // @Units: Hz
+    // @Range: 0.0 1.0
+    // @User: Advance
+    AP_GROUPINFO("RADAR_HZ", 7, ModeCNDN, _radar_flt_hz, 0.25),
+
+    // @Param: LEVEL_PIN
+    // @DisplayName: Level sensor gpio pin
+    // @Description: Level sensor gpio pin
+    // @Range: 0.0 1.0
+    // @User: Advance
+    AP_GROUPINFO("LEVEL_PIN", 8, ModeCNDN, _sensor_pin, 59),
+
+    // @Param: AVOID_CM
+    // @DisplayName: AVOIDANCE DISTANCE CM
+    // @Description: Avoidance distance for break mode
+    // @Range: 200 1000
+    // @User: Advance
+    AP_GROUPINFO("AVOID_CM", 9, ModeCNDN, _avoid_cm, 600),
+
+    // @Param: MC8_OPTION
+    // @DisplayName: MC8_OPTION
+    // @Description: Mission computer options
+    // @Range: 0
+    // @User: Advance
+    AP_GROUPINFO("MC8_OPTION", 10, ModeCNDN, _mc8_option, 0),
+
+    AP_GROUPEND
+};
+
+class GPIOSensor
+{
+private:
+    GPIOSensor() {
+        toTICK.reset(0);
+    }
+#ifdef HAL_PUMP_SENSOR_PIN
+    uint8_t u_pin = HAL_PUMP_SENSOR_PIN;
+    uint8_t l_pin = HAL_PUMP_SENSOR_PIN;
+#else
+    uint8_t u_pin = 0;
+    uint8_t l_pin = 0;
+#endif
+    uint32_t l_ms = 0;
+    uint32_t l_cn = 0;
+    uint32_t l_en = 0;
+    uint32_t l_dt = 0;
+    uint32_t m_count = 0;
+    uint32_t l_count = 0;
+    bool m_init = false;
+    bool m_set = false;
+    bool m_pin_state = false;
+
+public:
+    CNTimeout toTICK;
+
+    static GPIOSensor& get() {
+        static GPIOSensor sgpio;
+        return sgpio;
+    }
+ 
+    void set_pin(uint8_t pin) {
+        u_pin = pin;
+        if (l_pin != u_pin) {
+            l_pin = u_pin;
+            m_init = false;
+        }
+    }
+
+    bool isTimeout(uint32_t now, uint32_t tout) {
+        if (l_ms == 0) l_ms = now;
+        return (now - l_ms) > tout;
+    }
+
+    void resetTimeout(uint32_t now) { l_ms = now; }
+
+    bool stateChanged(bool bSet) {
+        if (m_set != bSet) {
+            m_set = bSet;
+            return true;
+        }
+        return false;
+    }
+
+    uint32_t getPulse() { return 0;/*AP::rpm()->get_counter(0);*/ }
+
+    void resetCount() { /*AP::rpm()->reset_counter(0);*/ }
+
+    float getCount() {
+        if (u_pin) {
+            // ensure we are in input mode
+            hal.gpio->pinMode(u_pin, HAL_GPIO_INPUT);
+            bool bState = hal.gpio->read(u_pin); // Active Low
+            return bState ? 0.0f : 1000.0f;
+        }
+        return 0.0f;
+    }
+
+    float getRPM() {
+        return 0.0f;/*AP::rpm()->get_rpm(0);*/
+    }
+};
 /*
  * Init and run calls for loiter flight mode
  */
@@ -78,6 +238,11 @@ void ModeCNDN::precision_loiter_xy()
     pos_control->update_xy_controller();
 }
 #endif
+
+void ModeCNDN::init_speed()
+{
+    wp_nav->wp_and_spline_init();
+}
 
 // loiter_run - runs the loiter controller
 // should be called at 100hz or more
@@ -213,6 +378,29 @@ int32_t ModeCNDN::wp_bearing() const
     return loiter_nav->get_bearing_to_target();
 }
 
+// return manual control to the pilot
+void ModeCNDN::return_to_manual_control(bool maintain_target)
+{
+    cmd_mode = 0;
+
+    copter.rangefinder_state.enabled = false;
+
+    if (stage != MANUAL) {
+        stage = MANUAL;
+        loiter_nav->clear_pilot_desired_acceleration();
+        if (maintain_target) {
+            const Vector3f wp_dest = wp_nav->get_wp_destination();
+            loiter_nav->init_target(wp_dest.xy());
+            if (wp_nav->origin_and_destination_are_terrain_alt()) {
+                copter.surface_tracking.set_target_alt_cm(wp_dest.z);
+            }
+        } else {
+            loiter_nav->init_target();
+        }
+        auto_yaw.set_mode(Mode::AutoYaw::Mode::HOLD);
+    }
+}
+
 void ModeCNDN::handle_message(const mavlink_message_t &msg)
 {
     switch (msg.msgid) {
@@ -226,6 +414,142 @@ void ModeCNDN::handle_message(const mavlink_message_t &msg)
             } else if (strncmp(m.name, "LOGDISARM", 10) == 0) {
             }
         } break;
+    }
+}
+
+void ModeCNDN::mission_trigger(uint8_t dest_num)
+{
+    logdebug("mission_trigger(%d)", dest_num);
+
+    bool bControlled = copter.flightmode == &copter.mode_auto/* || copter.flightmode == &copter.mode_zigzag*/;
+
+    if (bControlled) { // 속도/분사 제어
+        float mss, prr;
+        switch (dest_num) {
+            case 6: // CNDN_SPD_UP
+                if (copter.flightmode == &copter.mode_auto && edge_mode) {
+                    mss = _spd_edge_cm.get() + 50.0f;
+                    mss = constrain_float(mss, 100.0f, 1500.0f);
+                    copter.wp_nav->set_speed_xy(mss);
+                    _spd_edge_cm.set_and_save(mss);
+                } else {
+                    mss = _spd_auto_cm.get() + 50.0f;
+                    mss = constrain_float(mss, 100.0f, 1500.0f);
+                    copter.wp_nav->set_speed_xy(mss);
+                    _spd_auto_cm.set_and_save(mss);
+                }
+                gcsdebug("속도 증가: %0.2f m/s", mss * 1e-2f);
+            break;
+
+            case 7: // CNDN_SPD_DN
+                if (copter.flightmode == &copter.mode_auto && edge_mode) {
+                    mss = _spd_edge_cm.get() - 50.0f;
+                    mss = constrain_float(mss, 100.0f, 1500.0f);
+                    copter.wp_nav->set_speed_xy(mss);
+                    _spd_edge_cm.set_and_save(mss);
+                } else {
+                    mss = _spd_auto_cm.get() - 50.0f;
+                    mss = constrain_float(mss, 100.0f, 1500.0f);
+                    copter.wp_nav->set_speed_xy(mss);
+                    _spd_auto_cm.set_and_save(mss);
+                }
+                gcsdebug("속도 감소: %0.2f m/s", mss * 1e-2f);
+            break;
+
+#if HAL_SPRAYER_ENABLED == ENABLED
+            case 8: // CNDN_SPR_UP
+                prr = copter.sprayer.inc_pump_rate(+2.5f);
+                gcsdebug("분무량 증가: %0.1f%%", prr);
+            break;
+            case 9: // CNDN_SPR_DN
+                prr = copter.sprayer.inc_pump_rate(-2.5f);
+                gcsdebug("분무량 감소: %0.1f%%", prr);
+            break;
+#endif
+
+#if MODE_ZIGZAG_ENABLED == ENABLED
+            case 0: case 1: case 2:
+                if (copter.flightmode == &copter.mode_zigzag)
+                    copter.mode_zigzag.save_or_move_to_destination(dest_num);
+            break;
+#endif
+        }
+        return;
+    }
+
+    switch (dest_num) {
+        case 20: {
+            Location loc(copter.current_loc);
+            Location home(AP::ahrs().get_home());
+            int32_t yaws = wrap_180_cd(ahrs.yaw_sensor);
+            gcs().send_cndn_trigger(home, loc, 0, 0, 2, yaws);
+        } return;
+    }
+
+    if (dest_num > 2)
+        return;
+
+    // handle state machine changes
+    // if (copter.flightmode != &copter.mode_cndn) {
+    //     // 씨엔디엔 모드가 아닐 때
+    //     return;
+    // }
+
+    switch (stage) {
+    case MANUAL:
+        if (_method.get() == 0)
+            break;
+
+        if (dest_num > 0) {
+            if (copter.flightmode != &copter.mode_cndn)
+                break;
+
+            cmd_mode = dest_num;
+            init_speed();
+            Vector3f stopping_point;
+            wp_nav->get_wp_stopping_point(stopping_point);
+            wp_nav->set_wp_destination(stopping_point, false);
+
+            Location loc(copter.current_loc);
+            Location home(AP::ahrs().get_home());
+            int32_t yaws = wrap_180_cd(ahrs.yaw_sensor);
+            gcs().send_cndn_trigger(home, loc, _dst_eg_cm.get(), _spray_width_cm.get(), m_bZigZag?1:0, yaws);
+            gcsdebug("[방제검색] %d,%d,%d", (int)loc.lat, (int)loc.lng, (int)yaws);
+
+            float alt_cm = 0.0f;
+            if (wp_nav->get_terrain_offset(alt_cm)) {
+                copter.surface_tracking.set_target_alt_cm(alt_cm);
+            }
+        }
+        break;
+
+    case PREPARE_AUTO:
+        if (_method.get() == 0){
+            init_speed();
+            return_to_manual_control(false);
+            return;
+        }
+
+        if (dest_num == 2)
+            cmd_mode = dest_num;
+
+        if (dest_num == 0) {
+            init_speed();
+            return_to_manual_control(false);
+            return;
+        }
+        break;
+
+    // case AUTO:
+    // case PREPARE_ABLINE:
+    // case FINISHED:
+    default:
+        if (dest_num == 0) {
+            init_speed();
+            return_to_manual_control(false);
+            return;
+        }
+        break;
     }
 }
 
